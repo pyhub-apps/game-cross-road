@@ -75,8 +75,40 @@ export class WebInputManager implements IInputManager {
   private handleKeyDown = (event: KeyboardEvent): void => {
     if (!this.enabled) return;
     
-    const action = this.keyMap[event.key];
+    // Try to get action from key first (for English mode)
+    let action = this.keyMap[event.key];
+    
+    // If not found, try keyCode for language-independent handling
+    if (!action) {
+      switch(event.keyCode) {
+        case 38: // ArrowUp
+        case 87: // W
+          action = 'MOVE_FORWARD';
+          break;
+        case 40: // ArrowDown
+        case 83: // S
+          action = 'MOVE_BACKWARD';
+          break;
+        case 37: // ArrowLeft
+        case 65: // A
+          action = 'MOVE_LEFT';
+          break;
+        case 39: // ArrowRight
+        case 68: // D
+          action = 'MOVE_RIGHT';
+          break;
+        case 27: // Escape
+          action = 'PAUSE';
+          break;
+        case 82: // R
+          action = 'RESTART';
+          break;
+      }
+    }
+    
     if (!action) return;
+    
+    console.log('Key pressed:', event.key, 'KeyCode:', event.keyCode, 'Action:', action);
     
     event.preventDefault();
     this.emitInput({

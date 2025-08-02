@@ -1,6 +1,6 @@
 import { ISystem } from '../../core/interfaces/ISystem';
-import { IEntityManager } from '../../core/interfaces/IEntity';
-import { IComponentManager } from '../../core/interfaces/IComponent';
+import { EntityManager } from '../../core/managers/EntityManager';
+import { ComponentManager } from '../../core/managers/ComponentManager';
 import { Transform } from '../../core/components/Transform';
 import { Player } from '../../core/components/Player';
 import { IInputManager, InputEvent } from '../../infrastructure/interfaces/IInputManager';
@@ -15,8 +15,8 @@ export class PlayerSystem implements ISystem {
   priority = 50; // Run before movement system
   enabled = true;
   
-  private entityManager!: IEntityManager;
-  private componentManager!: IComponentManager;
+  private entityManager!: EntityManager;
+  private componentManager!: ComponentManager;
   private inputManager: IInputManager;
   private eventBus: IEventBus;
   private gameStateManager: IGameStateManager;
@@ -36,7 +36,7 @@ export class PlayerSystem implements ISystem {
     this.gameStateManager = gameStateManager;
   }
   
-  initialize(entityManager: IEntityManager, componentManager: IComponentManager): void {
+  initialize(entityManager: EntityManager, componentManager: ComponentManager): void {
     this.entityManager = entityManager;
     this.componentManager = componentManager;
     
@@ -65,8 +65,11 @@ export class PlayerSystem implements ISystem {
     const gameState = this.gameStateManager.getState();
     if (!gameState.playerEntityId) return;
     
-    const player = this.componentManager.getComponent<Player>(gameState.playerEntityId, 'player');
-    const transform = this.componentManager.getComponent<Transform>(gameState.playerEntityId, 'transform');
+    const entity = this.entityManager.getEntity(gameState.playerEntityId);
+    if (!entity) return;
+    
+    const player = this.componentManager.getComponent<Player>(entity, 'player');
+    const transform = this.componentManager.getComponent<Transform>(entity, 'transform');
     
     if (!player || !transform || !player.isAlive || !player.inputEnabled) return;
     
@@ -142,7 +145,10 @@ export class PlayerSystem implements ISystem {
     const playerId = gameState.playerEntityId;
     if (data.entityA !== playerId && data.entityB !== playerId) return;
     
-    const player = this.componentManager.getComponent<Player>(playerId, 'player');
+    const entity = this.entityManager.getEntity(playerId);
+    if (!entity) return;
+    
+    const player = this.componentManager.getComponent<Player>(entity, 'player');
     if (!player || !player.isAlive) return;
     
     // Determine collision type and handle accordingly
@@ -175,7 +181,10 @@ export class PlayerSystem implements ISystem {
     const gameState = this.gameStateManager.getState();
     if (!gameState.playerEntityId) return;
     
-    const player = this.componentManager.getComponent<Player>(gameState.playerEntityId, 'player');
+    const entity = this.entityManager.getEntity(gameState.playerEntityId);
+    if (!entity) return;
+    
+    const player = this.componentManager.getComponent<Player>(entity, 'player');
     if (!player) return;
     
     player.isAlive = false;
@@ -196,7 +205,10 @@ export class PlayerSystem implements ISystem {
     const gameState = this.gameStateManager.getState();
     if (gameState.currentState !== 'playing' || !gameState.playerEntityId) return;
     
-    const player = this.componentManager.getComponent<Player>(gameState.playerEntityId, 'player');
+    const entity = this.entityManager.getEntity(gameState.playerEntityId);
+    if (!entity) return;
+    
+    const player = this.componentManager.getComponent<Player>(entity, 'player');
     if (!player || !player.isAlive) return;
     
     // Check pressure system
