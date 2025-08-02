@@ -3,6 +3,7 @@ import { OrbitControls, Stats } from '@react-three/drei'
 import Camera from './Camera'
 import Lighting from './Lighting'
 import Ground from './Ground'
+import Game from './Game'
 
 export default function GameCanvas() {
   return (
@@ -36,17 +37,8 @@ export default function GameCanvas() {
         {/* 테스트용 바닥 */}
         <Ground />
         
-        {/* 테스트용 큐브 */}
-        <mesh position={[0, 0.5, 0]} castShadow>
-          <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial color="orange" />
-        </mesh>
-        
-        {/* 테스트용 구체 */}
-        <mesh position={[2, 0.5, 2]} castShadow>
-          <sphereGeometry args={[0.5, 32, 32]} />
-          <meshStandardMaterial color="lightblue" />
-        </mesh>
+        {/* 게임 컴포넌트 */}
+        <Game />
       </Canvas>
     </div>
   )

@@ -4,31 +4,33 @@
 export interface IGameState {
   // Game flow
   currentState: GameStateType;
-  isPaused: boolean;
+  isPaused?: boolean;
   
   // Player data
   playerEntityId: string | null;
-  currentScore: number;
+  score: number;
+  currentScore?: number;
   highScore: number;
   
   // World data
-  activeLanes: string[]; // Entity IDs of lane entities
-  visibleRange: {
+  activeLanes?: string[]; // Entity IDs of lane entities
+  visibleRange?: {
     minY: number;
     maxY: number;
   };
   
   // Camera
-  cameraY: number;
-  cameraScrollSpeed: number;
+  cameraY?: number;
+  cameraScrollSpeed?: number;
+  cameraOffset?: { x: number; y: number; z: number };
   
   // Pressure system
-  pressureTimer: number;
+  pressureTimer?: number;
   pressureActive: boolean;
   
   // Game settings
-  difficulty: number;
-  soundEnabled: boolean;
+  difficulty?: number;
+  soundEnabled?: boolean;
 }
 
 export type GameStateType = 'menu' | 'playing' | 'paused' | 'gameOver';

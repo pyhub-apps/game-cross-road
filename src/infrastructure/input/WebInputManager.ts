@@ -78,6 +78,8 @@ export class WebInputManager implements IInputManager {
     const action = this.keyMap[event.key];
     if (!action) return;
     
+    console.log('Key pressed:', event.key, 'Action:', action);
+    
     event.preventDefault();
     this.emitInput({
       action,
