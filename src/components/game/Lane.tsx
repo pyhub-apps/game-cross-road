@@ -33,7 +33,7 @@ export default function Lane({ type, position, width = 20 }: LaneProps) {
       position={position}
       receiveShadow
     >
-      <boxGeometry args={[width, 0.1, 1]} />
+      <boxGeometry args={[width, 0.1, 1.05]} />
       <meshStandardMaterial 
         color={LANE_COLORS[type]}
         roughness={LANE_PATTERNS[type].roughness}
