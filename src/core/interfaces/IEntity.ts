@@ -4,7 +4,8 @@
  */
 export interface IEntity {
   id: string;
-  active: boolean;
+  components: Map<string, any>;
+  isActive: boolean;
 }
 
 /**
