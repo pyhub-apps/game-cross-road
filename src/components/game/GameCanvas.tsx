@@ -4,6 +4,7 @@ import Camera from './Camera'
 import Lighting from './Lighting'
 import Ground from './Ground'
 import Game from './Game'
+import MapRenderer from './MapRenderer'
 
 export default function GameCanvas() {
   return (
@@ -36,6 +37,9 @@ export default function GameCanvas() {
         
         {/* 테스트용 바닥 */}
         <Ground />
+        
+        {/* 맵 렌더링 */}
+        <MapRenderer />
         
         {/* 게임 컴포넌트 */}
         <Game />

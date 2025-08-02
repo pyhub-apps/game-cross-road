@@ -5,7 +5,7 @@ interface GroundProps {
   size?: number
 }
 
-export default function Ground({ size = 20 }: GroundProps) {
+export default function Ground({ size = 50 }: GroundProps) {
   const meshRef = useRef<Mesh>(null!)
 
   return (

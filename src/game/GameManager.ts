@@ -10,6 +10,7 @@ import { MovementSystem } from './systems/MovementSystem'
 import { CollisionSystem } from './systems/CollisionSystem'
 import { CameraSystem } from './systems/CameraSystem'
 import { PressureSystem } from './systems/PressureSystem'
+import { MapSystem } from './systems/MapSystem'
 
 // Components
 import { Transform, createTransform } from '../core/components/Transform'
@@ -54,6 +55,7 @@ export class GameManager {
   
   private initializeSystems(): void {
     // Create systems
+    const mapSystem = new MapSystem(this.eventBus, this.gameStateManager)
     const playerSystem = new PlayerSystem(
       this.inputManager,
       this.eventBus,
@@ -65,6 +67,7 @@ export class GameManager {
     const pressureSystem = new PressureSystem(this.eventBus, this.gameStateManager)
     
     // Register and initialize systems
+    this.systems.set('map', mapSystem)
     this.systems.set('player', playerSystem)
     this.systems.set('movement', movementSystem)
     this.systems.set('collision', collisionSystem)
@@ -103,7 +106,7 @@ export class GameManager {
   
   update(deltaTime: number): void {
     // Update systems in order
-    const orderedSystems = ['player', 'movement', 'collision', 'camera', 'pressure']
+    const orderedSystems = ['map', 'player', 'movement', 'collision', 'camera', 'pressure']
     
     orderedSystems.forEach(systemName => {
       const system = this.systems.get(systemName)
@@ -149,6 +152,14 @@ export class GameManager {
   
   getEventBus() {
     return this.eventBus
+  }
+  
+  getEntityManager() {
+    return this.entityManager
+  }
+  
+  getComponentManager() {
+    return this.componentManager
   }
   
   reset(): void {

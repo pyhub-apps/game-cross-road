@@ -1,6 +1,6 @@
 import { IMapGenerator, GeneratedLane, MapGenerationRules } from '../interfaces/IMapGenerator';
 import { LaneType } from '../../core/components/Lane';
-import { GAME_CONFIG } from '../../shared/constants/GameConfig';
+import defaultRules from '../../shared/data/defaultMapRules.json';
 
 /**
  * Procedural map generator following PRD rules
@@ -9,51 +9,12 @@ export class MapGenerator implements IMapGenerator {
   private rules: MapGenerationRules;
   private laneHistory: LaneType[] = [];
   private lastSafeZoneY = 0;
+  private seed: number;
   
-  constructor() {
-    // Initialize with default rules from config
-    this.rules = {
-      laneConfigs: {
-        grass: {
-          type: 'grass',
-          minConsecutive: 1,
-          maxConsecutive: 10
-        },
-        road: {
-          type: 'road',
-          minConsecutive: 1,
-          maxConsecutive: 4,
-          spawnInterval: 2000,
-          spawnSpeed: 3,
-          obstacleTypes: ['car', 'truck']
-        },
-        river: {
-          type: 'river',
-          minConsecutive: 1,
-          maxConsecutive: 3,
-          spawnInterval: 3000,
-          spawnSpeed: 2,
-          obstacleTypes: ['log']
-        },
-        railway: {
-          type: 'railway',
-          minConsecutive: 1,
-          maxConsecutive: 2,
-          spawnInterval: 5000,
-          spawnSpeed: 8,
-          obstacleTypes: ['train']
-        }
-      },
-      safeZoneInterval: {
-        min: 5,
-        max: 10
-      },
-      difficultyScaling: {
-        speedIncrease: 0.1,
-        densityIncrease: 0.1,
-        intervalDecrease: 0.05
-      }
-    };
+  constructor(seed?: number) {
+    // Initialize with default rules from JSON
+    this.rules = defaultRules as MapGenerationRules;
+    this.seed = seed || Date.now();
   }
   
   generateLanes(startY: number, count: number, difficulty: number): GeneratedLane[] {
@@ -127,27 +88,41 @@ export class MapGenerator implements IMapGenerator {
   private selectDifferentType(excludeType: LaneType): LaneType {
     const types: LaneType[] = ['grass', 'road', 'river'];
     const available = types.filter(t => t !== excludeType);
-    return available[Math.floor(Math.random() * available.length)];
+    return available[Math.floor(this.seededRandom() * available.length)];
   }
   
   private weightedRandomSelection(): LaneType {
-    const weights = {
-      grass: 0.5,
-      road: 0.3,
-      river: 0.2
-    };
+    // Use weights from config, excluding railway for MVP
+    const weights: Record<string, number> = {};
+    let totalWeight = 0;
     
-    const random = Math.random();
+    ['grass', 'road', 'river'].forEach(type => {
+      const config = this.rules.laneConfigs[type as LaneType];
+      if (config && 'weight' in config) {
+        weights[type] = (config as any).weight || 0.3;
+        totalWeight += weights[type];
+      }
+    });
+    
+    const random = this.seededRandom();
     let cumulative = 0;
     
     for (const [type, weight] of Object.entries(weights)) {
-      cumulative += weight;
+      cumulative += weight / totalWeight;
       if (random < cumulative) {
         return type as LaneType;
       }
     }
     
     return 'grass';
+  }
+  
+  /**
+   * Seeded random number generator for reproducible maps
+   */
+  private seededRandom(): number {
+    this.seed = (this.seed * 9301 + 49297) % 233280;
+    return this.seed / 233280;
   }
   
   private generateObstacles(
@@ -164,18 +139,26 @@ export class MapGenerator implements IMapGenerator {
     // Adjust spawn probability based on difficulty
     const spawnChance = Math.min(0.8, 0.3 + (difficulty * 0.05));
     
+    // Use configured density if available
+    const configDensity = (config as any).obstacleDensity || 0.3;
+    const adjustedDensity = Math.min(0.8, configDensity + (difficulty * this.rules.difficultyScaling.densityIncrease));
+    
     // Generate obstacles at grid positions
     for (let x = -10; x <= 10; x += 2) {
-      if (Math.random() < spawnChance) {
+      if (this.seededRandom() < adjustedDensity) {
         const obstacleType = config.obstacleTypes[
-          Math.floor(Math.random() * config.obstacleTypes.length)
+          Math.floor(this.seededRandom() * config.obstacleTypes.length)
         ];
+        
+        // Apply difficulty scaling to speed
+        const baseSpeed = config.spawnSpeed || 0;
+        const speedMultiplier = 1 + (difficulty * this.rules.difficultyScaling.speedIncrease);
         
         obstacles.push({
           type: obstacleType,
           xPosition: x,
-          speed: config.spawnSpeed ? config.spawnSpeed * (1 + difficulty * 0.1) : 0,
-          direction: Math.random() < 0.5 ? 'left' : 'right'
+          speed: baseSpeed * speedMultiplier,
+          direction: this.seededRandom() < 0.5 ? 'left' : 'right'
         });
       }
     }

@@ -12,7 +12,8 @@ export type GameEvent =
   | { type: 'PRESSURE_ACTIVATED'; data: { timeRemaining: number } }
   | { type: 'PRESSURE_DEACTIVATED'; data: {} }
   | { type: 'GAME_STATE_CHANGED'; data: { from: string; to: string } }
-  | { type: 'COLLISION_DETECTED'; data: { entityA: string; entityB: string; collisionType: string } };
+  | { type: 'COLLISION_DETECTED'; data: { entityA: string; entityB: string; collisionType: string } }
+  | { type: 'LANES_UPDATED'; data: { visibleLanes: number; totalLanes: number } };
 
 /**
  * Event handler type

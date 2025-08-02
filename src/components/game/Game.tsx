@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Vector3 } from 'three'
+import { Html } from '@react-three/drei'
 import Player from './Player'
 import { GameManager } from '../../game/GameManager'
 
@@ -45,6 +46,25 @@ export default function Game() {
     // This can be used for camera tracking later
   }
   
+  // Debug controls
+  const movePlayer = (direction: 'up' | 'down' | 'left' | 'right') => {
+    const gameManager = gameManagerRef.current
+    if (!gameManager) return
+    
+    const inputManager = (gameManager as any).inputManager
+    if (!inputManager) return
+    
+    const keyMap = {
+      up: 'ArrowUp',
+      down: 'ArrowDown', 
+      left: 'ArrowLeft',
+      right: 'ArrowRight'
+    }
+    
+    const event = new KeyboardEvent('keydown', { key: keyMap[direction] })
+    inputManager.handleKeyDown(event)
+  }
+  
   return (
     <>
       {isPlaying && (
@@ -53,6 +73,25 @@ export default function Game() {
           onPositionChange={handlePlayerPositionChange}
         />
       )}
+      
+      {/* Debug controls */}
+      <Html position={[0, 5, 0]}>
+        <div style={{ 
+          background: 'rgba(0,0,0,0.7)', 
+          padding: '10px', 
+          borderRadius: '5px',
+          color: 'white',
+          fontSize: '12px'
+        }}>
+          <div>Player Y: {playerPosition[2] ? -playerPosition[2] : 0}</div>
+          <div style={{ marginTop: '5px' }}>
+            <button onClick={() => movePlayer('up')} style={{ margin: '2px' }}>↑</button>
+            <button onClick={() => movePlayer('down')} style={{ margin: '2px' }}>↓</button>
+            <button onClick={() => movePlayer('left')} style={{ margin: '2px' }}>←</button>
+            <button onClick={() => movePlayer('right')} style={{ margin: '2px' }}>→</button>
+          </div>
+        </div>
+      </Html>
     </>
   )
 }
