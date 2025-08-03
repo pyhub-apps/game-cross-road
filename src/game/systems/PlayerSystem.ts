@@ -80,20 +80,24 @@ export class PlayerSystem implements ISystem {
       case 'MOVE_FORWARD':
         transform.position.y += this.GRID_SIZE;
         moved = true;
+        console.log('PlayerSystem: Moving forward, new Y:', transform.position.y);
         break;
       case 'MOVE_BACKWARD':
         if (transform.position.y > 0) {
           transform.position.y -= this.GRID_SIZE;
           moved = true;
+          console.log('PlayerSystem: Moving backward, new Y:', transform.position.y);
         }
         break;
       case 'MOVE_LEFT':
         transform.position.x -= this.GRID_SIZE;
         moved = true;
+        console.log('PlayerSystem: Moving left, new X:', transform.position.x);
         break;
       case 'MOVE_RIGHT':
         transform.position.x += this.GRID_SIZE;
         moved = true;
+        console.log('PlayerSystem: Moving right, new X:', transform.position.x);
         break;
     }
     
