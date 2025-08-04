@@ -179,6 +179,24 @@ export class GameManager {
     })
   }
   
+  /**
+   * Restart the game completely
+   */
+  restart(): void {
+    // Reset everything
+    this.reset()
+    
+    // Re-initialize map system to recreate lanes
+    const mapSystem = this.systems.get('map')
+    if (mapSystem && mapSystem.initialize) {
+      console.log('GameManager: Re-initializing map system')
+      mapSystem.initialize(this.entityManager, this.componentManager)
+    }
+    
+    // Create player and start game
+    this.createPlayer()
+  }
+  
   destroy(): void {
     // Destroy all systems
     this.systems.forEach(system => {

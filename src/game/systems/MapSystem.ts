@@ -26,6 +26,7 @@ export class MapSystem implements ISystem {
   
   // Track lane entities
   private laneEntities: Map<number, string> = new Map() // y -> entityId
+  private lastPlayerY: number = 0
   
   constructor(eventBus: IEventBus, gameStateManager: IGameStateManager) {
     this.eventBus = eventBus
@@ -39,12 +40,15 @@ export class MapSystem implements ISystem {
     this.componentManager = componentManager
     this.laneFactory = new LaneFactory(entityManager, componentManager)
     
+    // Clear existing lane entities (for restart)
+    this.laneEntities.clear()
+    
     // Initialize chunk manager with starting chunks
     this.chunkManager.initialize()
     console.log('MapSystem: Initialized chunk manager')
     
-    // Create initial lane entities
-    const initialLanes = this.chunkManager.getLanesInRange(-10, 20)
+    // Create initial lane entities with wider range
+    const initialLanes = this.chunkManager.getLanesInRange(-20, 30)
     console.log('MapSystem: Creating', initialLanes.length, 'initial lanes')
     
     initialLanes.forEach(lane => {
@@ -70,20 +74,38 @@ export class MapSystem implements ISystem {
   }
   
   update(deltaTime: number): void {
-    if (!this.enabled) return
+    if (!this.enabled) {
+      console.log('MapSystem: Not enabled')
+      return
+    }
     
     const gameState = this.gameStateManager.getState()
-    if (gameState.currentState !== 'playing' || !gameState.playerEntityId) return
+    if (gameState.currentState !== 'playing' || !gameState.playerEntityId) {
+      console.log('MapSystem: Not playing or no player')
+      return
+    }
     
     // Get player position
     const playerEntity = this.entityManager.getEntity(gameState.playerEntityId)
-    if (!playerEntity) return
+    if (!playerEntity) {
+      console.log('MapSystem: No player entity found')
+      return
+    }
     
     const transform = this.componentManager.getComponent<Transform>(playerEntity, 'transform')
-    if (!transform) return
+    if (!transform) {
+      console.log('MapSystem: No transform component')
+      return
+    }
     
     const playerY = transform.position.y
     const difficulty = this.calculateDifficulty(playerY)
+    
+    // Log player position on movement
+    if (this.lastPlayerY !== playerY) {
+      console.log('MapSystem: Player moved to Y:', playerY)
+      this.lastPlayerY = playerY
+    }
     
     // Update chunks based on player position
     this.chunkManager.update(playerY, difficulty)
@@ -110,13 +132,17 @@ export class MapSystem implements ISystem {
   }
   
   private updateVisibleLanes(playerY: number): void {
-    const viewDistance = 20 // How many lanes to show ahead and behind
+    const viewDistance = 30 // Increased to show more lanes
     const minY = Math.floor(playerY - viewDistance / 2)
     const maxY = Math.ceil(playerY + viewDistance)
+    
+    console.log('MapSystem: Updating visible lanes for playerY:', playerY, 'range:', minY, 'to', maxY)
     
     // Get lanes that should be visible
     const visibleLanes = this.chunkManager.getLanesInRange(minY, maxY)
     const visibleYPositions = new Set(visibleLanes.map(l => l.yPosition))
+    
+    console.log('MapSystem: Found', visibleLanes.length, 'lanes in range')
     
     // Remove lanes that are no longer visible
     const toRemove: number[] = []
@@ -129,12 +155,17 @@ export class MapSystem implements ISystem {
     toRemove.forEach(y => this.laneEntities.delete(y))
     
     // Add new lanes that should be visible
+    let addedCount = 0
     visibleLanes.forEach(lane => {
       if (!this.laneEntities.has(lane.yPosition)) {
         const entity = this.laneFactory.createLaneEntity(lane)
         this.laneEntities.set(lane.yPosition, entity.id)
+        addedCount++
       }
     })
+    
+    console.log('MapSystem: Added', addedCount, 'new lanes, removed', toRemove.length, 'old lanes')
+    console.log('MapSystem: Total lane entities:', this.laneEntities.size)
     
     // Emit event for lane updates
     this.eventBus.emit({

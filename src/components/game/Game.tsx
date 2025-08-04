@@ -5,35 +5,80 @@ import { Html } from '@react-three/drei'
 import Player from './Player'
 import { GameManager } from '../../game/GameManager'
 
-export default function Game() {
+interface GameProps {
+  onPlayerPositionChange?: (position: [number, number, number]) => void
+  onCameraMove?: (position: [number, number, number]) => void
+}
+
+export default function Game({ onPlayerPositionChange, onCameraMove }: GameProps) {
   const gameManagerRef = useRef<GameManager | null>(null)
   const [playerPosition, setPlayerPosition] = useState<[number, number, number]>([0, 0, 0])
   const [isPlaying, setIsPlaying] = useState(false)
+  
+  // Store callbacks in refs to prevent re-initialization
+  const onPlayerPositionChangeRef = useRef(onPlayerPositionChange)
+  const onCameraMoveRef = useRef(onCameraMove)
+  
+  useEffect(() => {
+    onPlayerPositionChangeRef.current = onPlayerPositionChange
+    onCameraMoveRef.current = onCameraMove
+  }, [onPlayerPositionChange, onCameraMove])
   
   useEffect(() => {
     // Initialize game manager
     const gameManager = GameManager.getInstance()
     gameManagerRef.current = gameManager
     
-    // Create player
-    gameManager.createPlayer()
-    setIsPlaying(true)
+    // Only create player if not already created
+    const currentState = gameManager.getGameState()
+    if (currentState.currentState !== 'playing') {
+      gameManager.createPlayer()
+      setIsPlaying(true)
+    } else {
+      setIsPlaying(true)
+    }
+    
+    // Set initial player position
+    const initialPosition: [number, number, number] = [0, 0, 0]
+    setPlayerPosition(initialPosition)
+    if (onPlayerPositionChangeRef.current) {
+      onPlayerPositionChangeRef.current(initialPosition)
+    }
     
     // Subscribe to player movement events
-    const unsubscribe = gameManager.getEventBus().on('PLAYER_MOVED', (event) => {
+    const unsubscribePlayer = gameManager.getEventBus().on('PLAYER_MOVED', (event) => {
       const { to } = event.data
       console.log('Player moved to:', to)
-      setPlayerPosition([to.x, 0, -to.y]) // Convert Y to Z for 3D view
+      const newPosition: [number, number, number] = [to.x, 0, -to.y] // Convert Y to Z for 3D view
+      setPlayerPosition(newPosition)
+      
+      // Notify parent component for camera tracking
+      if (onPlayerPositionChangeRef.current) {
+        onPlayerPositionChangeRef.current(newPosition)
+      }
+    })
+    
+    // Subscribe to camera movement events
+    const unsubscribeCamera = gameManager.getEventBus().on('CAMERA_MOVED', (event) => {
+      const { position } = event.data
+      console.log('Camera moved to:', position)
+      const cameraPosition: [number, number, number] = [position.x, 0, -position.y] // Convert Y to Z for 3D view
+      
+      // Notify parent component for camera updates
+      if (onCameraMoveRef.current) {
+        onCameraMoveRef.current(cameraPosition)
+      }
     })
     
     // Log initial state
     console.log('Game initialized')
     
     return () => {
-      unsubscribe()
+      unsubscribePlayer()
+      unsubscribeCamera()
       gameManager.reset()
     }
-  }, [])
+  }, []) // Remove dependencies to prevent re-initialization
   
   // Update game logic
   useFrame((_, delta) => {
