@@ -20,18 +20,9 @@ export interface Obstacle {
   color?: string;
 }
 
-// 장애물 생성 설정
-interface ObstacleConfig {
-  type: ObstacleType;
-  laneY: number;
-  count: number;
-  minGap: number;
-  speed: { min: number; max: number };
-  size?: { min: number; max: number }; // For logs
-}
-
 export class ObstacleSystem extends EventEmitter {
   private obstacles: Map<string, Obstacle> = new Map();
+  private activeObstacles: Set<string> = new Set(); // 활성 장애물 ID만 관리
   private obstaclePool: Map<ObstacleType, Obstacle[]> = new Map();
   private nextId: number = 0;
   private worldWidth: number = 20; // 월드 너비
@@ -98,6 +89,7 @@ export class ObstacleSystem extends EventEmitter {
     const obstacle = pool.find(o => !o.active);
     if (obstacle) {
       obstacle.active = true;
+      this.activeObstacles.add(obstacle.id); // 활성 목록에 추가
       return obstacle;
     }
     return null;
@@ -107,6 +99,7 @@ export class ObstacleSystem extends EventEmitter {
   private returnToPool(obstacle: Obstacle): void {
     obstacle.active = false;
     obstacle.position = { x: 0, y: 0, z: 0 };
+    this.activeObstacles.delete(obstacle.id); // 활성 목록에서 제거
   }
 
   // 레인에 장애물 생성
@@ -129,7 +122,7 @@ export class ObstacleSystem extends EventEmitter {
     const count = 2 + Math.floor(Math.random() * 2); // 2-3대
     const direction = Math.random() > 0.5 ? 1 : -1;
     const speed = 1 + Math.random() * 2; // 1-3 units/sec
-    const minGap = 3; // 최소 간격 3칸
+    const minGap = 2; // 최소 간격 2칸 (요구사항 충족)
     
     const positions = this.calculatePositions(count, minGap, 2); // 차량 길이 2
 
@@ -159,8 +152,9 @@ export class ObstacleSystem extends EventEmitter {
     const speed = 0.5 + Math.random() * 1.5; // 0.5-2 units/sec
     const minGap = 2; // 최소 간격 2칸
     
-    const positions: number[] = [];
-    let currentX = 0;
+    // 먼저 모든 나무줄기를 생성하고 위치 계산
+    const logs: Obstacle[] = [];
+    let currentX = -this.worldWidth / 2;
     
     for (let i = 0; i < count; i++) {
       const log = this.getFromPool(ObstacleType.LOG);
@@ -169,11 +163,11 @@ export class ObstacleSystem extends EventEmitter {
       // 랜덤 길이 (2-4칸)
       log.size.length = 2 + Math.floor(Math.random() * 3);
       
-      positions.push(currentX);
-      currentX += log.size.length + minGap + Math.random() * 3;
+      // 나무줄기 중심 위치 설정
+      const logCenterX = currentX + log.size.length / 2;
       
       log.position = { 
-        x: direction === 1 ? -this.worldWidth / 2 + currentX : this.worldWidth / 2 - currentX, 
+        x: logCenterX, 
         y: lane.y, 
         z: 0.25 
       };
@@ -181,8 +175,20 @@ export class ObstacleSystem extends EventEmitter {
       log.speed = speed;
       log.laneY = lane.y;
       
+      // 다음 나무줄기 시작 위치 계산
+      currentX += log.size.length + minGap + Math.random() * 2;
+      
+      logs.push(log);
       this.obstacles.set(log.id, log);
     }
+    
+    // 나무줄기들을 중앙에 배치하기 위해 오프셋 계산
+    const totalWidth = currentX + this.worldWidth / 2;
+    const offset = -totalWidth / 2;
+    
+    logs.forEach(log => {
+      log.position.x += offset;
+    });
 
     this.emit('obstaclesGenerated', { laneY: lane.y, type: ObstacleType.LOG });
   }
@@ -204,10 +210,12 @@ export class ObstacleSystem extends EventEmitter {
 
   // 장애물 업데이트
   public update(deltaTime: number): void {
-    const obstaclesArray = Array.from(this.obstacles.values());
+    // 활성 장애물만 순회 (성능 최적화)
+    const activeObstaclesList: Obstacle[] = [];
     
-    for (const obstacle of obstaclesArray) {
-      if (!obstacle.active) continue;
+    for (const id of this.activeObstacles) {
+      const obstacle = this.obstacles.get(id);
+      if (!obstacle || !obstacle.active) continue;
 
       // 이동
       obstacle.position.x += obstacle.speed * obstacle.direction * deltaTime;
@@ -219,9 +227,11 @@ export class ObstacleSystem extends EventEmitter {
       } else if (obstacle.position.x < -halfWidth) {
         obstacle.position.x = halfWidth;
       }
+      
+      activeObstaclesList.push(obstacle);
     }
 
-    this.emit('obstaclesUpdated', obstaclesArray.filter(o => o.active));
+    this.emit('obstaclesUpdated', activeObstaclesList);
   }
 
   // 레인 제거 시 장애물 정리
@@ -245,11 +255,13 @@ export class ObstacleSystem extends EventEmitter {
       if (!obstacle.active) continue;
 
       // AABB 충돌 검사
-      const halfWidth = obstacle.size.width / 2;
+      // 차량/나무줄기는 X축이 길이 방향, Y축이 너비 방향
       const halfLength = obstacle.size.length / 2;
+      const halfWidth = obstacle.size.width / 2;
+      const playerRadius = 0.4; // 플레이어 반경
       
-      const collisionX = Math.abs(playerPosition.x - obstacle.position.x) < halfWidth + 0.4;
-      const collisionY = Math.abs(playerPosition.y - obstacle.position.y) < 0.5;
+      const collisionX = Math.abs(playerPosition.x - obstacle.position.x) < halfLength + playerRadius;
+      const collisionY = Math.abs(playerPosition.y - obstacle.position.y) < halfWidth + playerRadius;
       
       if (collisionX && collisionY) {
         return obstacle;
@@ -263,7 +275,6 @@ export class ObstacleSystem extends EventEmitter {
     for (const obstacle of this.obstacles.values()) {
       if (!obstacle.active || obstacle.type !== ObstacleType.LOG) continue;
 
-      const halfWidth = obstacle.size.width / 2;
       const halfLength = obstacle.size.length / 2;
       
       const onLogX = Math.abs(playerPosition.x - obstacle.position.x) <= halfLength;
@@ -278,7 +289,14 @@ export class ObstacleSystem extends EventEmitter {
 
   // 현재 활성 장애물 가져오기
   public getActiveObstacles(): Obstacle[] {
-    return Array.from(this.obstacles.values()).filter(o => o.active);
+    const activeList: Obstacle[] = [];
+    for (const id of this.activeObstacles) {
+      const obstacle = this.obstacles.get(id);
+      if (obstacle && obstacle.active) {
+        activeList.push(obstacle);
+      }
+    }
+    return activeList;
   }
 
   // 시스템 리셋
@@ -287,6 +305,7 @@ export class ObstacleSystem extends EventEmitter {
       this.returnToPool(obstacle);
     });
     this.obstacles.clear();
+    this.activeObstacles.clear(); // 활성 목록도 초기화
     this.emit('obstaclesReset');
   }
 

@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Obstacle, ObstacleType } from '../../game/systems/ObstacleSystem';
@@ -6,6 +6,7 @@ import { Obstacle, ObstacleType } from '../../game/systems/ObstacleSystem';
 interface ObstacleRendererProps {
   obstacles: Obstacle[];
   frustumCulling?: boolean;
+  debug?: boolean; // 명시적 디버그 모드
 }
 
 // 차량 메시 컴포넌트
@@ -52,6 +53,7 @@ const VehicleMesh: React.FC<{ obstacle: Obstacle }> = ({ obstacle }) => {
         material={material}
         castShadow
         receiveShadow
+        frustumCulled={true}
       />
       {/* 바퀴 표현 */}
       <group position={[obstacle.position.x, obstacle.position.z - obstacle.size.height / 2, -obstacle.position.y]}>
@@ -96,15 +98,7 @@ const LogMesh: React.FC<{ obstacle: Obstacle }> = ({ obstacle }) => {
     return geo;
   }, [obstacle.size]);
 
-  // 나무줄기 재질 생성
-  const material = useMemo(() => {
-    return new THREE.MeshPhongMaterial({
-      color: obstacle.color || '#8B4513',
-      emissive: new THREE.Color('#4A2C17'),
-      emissiveIntensity: 0.1,
-      shininess: 10,
-    });
-  }, [obstacle.color]);
+  // 나무줄기 재질은 직접 JSX에서 생성
 
   // 나무 텍스처 패턴 (간단한 나무결 표현)
   const barkPattern = useMemo(() => {
@@ -153,6 +147,7 @@ const LogMesh: React.FC<{ obstacle: Obstacle }> = ({ obstacle }) => {
       geometry={geometry}
       castShadow
       receiveShadow
+      frustumCulled={true}
     >
       <meshPhongMaterial
         color={obstacle.color || '#8B4513'}
@@ -224,6 +219,7 @@ const InstancedObstacles: React.FC<{
       args={[geometry, material, obstacles.length]}
       castShadow
       receiveShadow
+      frustumCulled={true}
     />
   );
 };
@@ -231,7 +227,7 @@ const InstancedObstacles: React.FC<{
 // 메인 ObstacleRenderer 컴포넌트
 export const ObstacleRenderer: React.FC<ObstacleRendererProps> = ({
   obstacles,
-  frustumCulling = true,
+  debug = false,
 }) => {
   // 타입별로 장애물 분류
   const { vehicles, logs } = useMemo(() => {
@@ -277,7 +273,7 @@ export const ObstacleRenderer: React.FC<ObstacleRendererProps> = ({
       )}
 
       {/* 디버그 모드: 충돌 박스 표시 */}
-      {process.env.NODE_ENV === 'development' && (
+      {debug && (
         <group name="debug-collision-boxes">
           {obstacles.map(obstacle => (
             <mesh

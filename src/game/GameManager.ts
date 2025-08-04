@@ -11,7 +11,7 @@ import { CollisionSystem } from './systems/CollisionSystem'
 import { CameraSystem } from './systems/CameraSystem'
 import { PressureSystem } from './systems/PressureSystem'
 import { MapSystem } from './systems/MapSystem'
-import { ObstacleSystem } from './systems/ObstacleSystem'
+import { ObstacleSystem, ObstacleType } from './systems/ObstacleSystem'
 
 // Components
 import { Transform, createTransform } from '../core/components/Transform'
@@ -132,29 +132,43 @@ export class GameManager {
     const playerPos = this.getPlayerPosition()
     
     if (playerPos && obstacleSystem) {
-      // Check vehicle collision
-      const collision = obstacleSystem.checkCollision(playerPos)
-      if (collision) {
-        this.eventBus.emit('GAME_OVER', { reason: 'vehicle_collision' })
-      }
+      const currentState = this.gameStateManager.getState().currentState
       
-      // Check if player is on a log or in water
-      const mapSystem = this.systems.get('map') as MapSystem
-      const currentLane = mapSystem.getLaneAt(playerPos.y)
-      
-      if (currentLane && currentLane.type === 'river') {
-        const onLog = obstacleSystem.isOnLog(playerPos)
-        if (!onLog) {
-          this.eventBus.emit('GAME_OVER', { reason: 'water_collision' })
-        } else {
-          // Move player with log
-          const state = this.gameStateManager.getState()
-          if (state.playerEntityId) {
-            const entity = this.entityManager.getEntity(state.playerEntityId)
-            if (entity) {
-              const transform = this.componentManager.getComponent<Transform>(entity, 'transform')
-              if (transform) {
-                transform.position.x += onLog.speed * onLog.direction * deltaTime
+      // 게임이 진행 중일 때만 충돌 검사
+      if (currentState === 'playing') {
+        // Check vehicle collision
+        const collision = obstacleSystem.checkCollision(playerPos)
+        if (collision && collision.type === ObstacleType.VEHICLE) {
+          this.eventBus.emit('GAME_OVER', { reason: 'vehicle_collision' })
+          this.gameStateManager.setState({ 
+            currentState: 'gameOver',
+            pressureActive: false 
+          })
+          return // 더 이상 처리하지 않음
+        }
+        
+        // Check if player is on a log or in water
+        const mapSystem = this.systems.get('map') as MapSystem
+        const currentLane = mapSystem.getLaneAt(playerPos.y)
+        
+        if (currentLane && currentLane.type === 'river') {
+          const onLog = obstacleSystem.isOnLog(playerPos)
+          if (!onLog) {
+            this.eventBus.emit('GAME_OVER', { reason: 'water_collision' })
+            this.gameStateManager.setState({ 
+              currentState: 'gameOver',
+              pressureActive: false 
+            })
+          } else {
+            // Move player with log
+            const state = this.gameStateManager.getState()
+            if (state.playerEntityId) {
+              const entity = this.entityManager.getEntity(state.playerEntityId)
+              if (entity) {
+                const transform = this.componentManager.getComponent<Transform>(entity, 'transform')
+                if (transform) {
+                  transform.position.x += onLog.speed * onLog.direction * deltaTime
+                }
               }
             }
           }
