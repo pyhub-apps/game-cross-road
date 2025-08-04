@@ -22,6 +22,42 @@ export type EventHandler<T extends GameEvent['type']> = (
 ) => void;
 
 /**
+ * Simple EventEmitter base class for systems that need event capabilities
+ */
+export class EventEmitter {
+  private events: Map<string, Function[]> = new Map();
+
+  on(event: string, listener: Function): () => void {
+    if (!this.events.has(event)) {
+      this.events.set(event, []);
+    }
+    this.events.get(event)!.push(listener);
+    
+    // Return unsubscribe function
+    return () => {
+      const listeners = this.events.get(event);
+      if (listeners) {
+        const index = listeners.indexOf(listener);
+        if (index > -1) {
+          listeners.splice(index, 1);
+        }
+      }
+    };
+  }
+
+  emit(event: string, data?: any): void {
+    const listeners = this.events.get(event);
+    if (listeners) {
+      listeners.forEach(listener => listener(data));
+    }
+  }
+
+  clear(): void {
+    this.events.clear();
+  }
+}
+
+/**
  * Event bus interface for decoupled communication
  */
 export interface IEventBus {

@@ -10,6 +10,8 @@ import { MovementSystem } from './systems/MovementSystem'
 import { CollisionSystem } from './systems/CollisionSystem'
 import { CameraSystem } from './systems/CameraSystem'
 import { PressureSystem } from './systems/PressureSystem'
+import { MapSystem } from './systems/MapSystem'
+import { ObstacleSystem } from './systems/ObstacleSystem'
 
 // Components
 import { Transform, createTransform } from '../core/components/Transform'
@@ -63,6 +65,8 @@ export class GameManager {
     const collisionSystem = new CollisionSystem(this.eventBus)
     const cameraSystem = new CameraSystem(this.eventBus, this.gameStateManager)
     const pressureSystem = new PressureSystem(this.eventBus, this.gameStateManager)
+    const mapSystem = new MapSystem()
+    const obstacleSystem = new ObstacleSystem()
     
     // Register and initialize systems
     this.systems.set('player', playerSystem)
@@ -70,12 +74,23 @@ export class GameManager {
     this.systems.set('collision', collisionSystem)
     this.systems.set('camera', cameraSystem)
     this.systems.set('pressure', pressureSystem)
+    this.systems.set('map', mapSystem)
+    this.systems.set('obstacle', obstacleSystem)
     
     // Initialize all systems
     this.systems.forEach(system => {
       if (system.initialize) {
         system.initialize(this.entityManager, this.componentManager)
       }
+    })
+    
+    // Subscribe to map events for obstacle generation
+    mapSystem.on('laneGenerated', (lane: any) => {
+      obstacleSystem.generateObstaclesForLane(lane)
+    })
+    
+    mapSystem.on('laneRemoved', (data: any) => {
+      obstacleSystem.removeObstaclesForLane(data.laneY)
     })
   }
   
@@ -103,14 +118,49 @@ export class GameManager {
   
   update(deltaTime: number): void {
     // Update systems in order
-    const orderedSystems = ['player', 'movement', 'collision', 'camera', 'pressure']
+    const orderedSystems = ['player', 'movement', 'map', 'obstacle', 'collision', 'camera', 'pressure']
     
     orderedSystems.forEach(systemName => {
       const system = this.systems.get(systemName)
-      if (system && system.enabled) {
+      if (system && system.enabled !== false) {
         system.update(deltaTime)
       }
     })
+    
+    // Check collision with obstacles
+    const obstacleSystem = this.systems.get('obstacle') as ObstacleSystem
+    const playerPos = this.getPlayerPosition()
+    
+    if (playerPos && obstacleSystem) {
+      // Check vehicle collision
+      const collision = obstacleSystem.checkCollision(playerPos)
+      if (collision) {
+        this.eventBus.emit('GAME_OVER', { reason: 'vehicle_collision' })
+      }
+      
+      // Check if player is on a log or in water
+      const mapSystem = this.systems.get('map') as MapSystem
+      const currentLane = mapSystem.getLaneAt(playerPos.y)
+      
+      if (currentLane && currentLane.type === 'river') {
+        const onLog = obstacleSystem.isOnLog(playerPos)
+        if (!onLog) {
+          this.eventBus.emit('GAME_OVER', { reason: 'water_collision' })
+        } else {
+          // Move player with log
+          const state = this.gameStateManager.getState()
+          if (state.playerEntityId) {
+            const entity = this.entityManager.getEntity(state.playerEntityId)
+            if (entity) {
+              const transform = this.componentManager.getComponent<Transform>(entity, 'transform')
+              if (transform) {
+                transform.position.x += onLog.speed * onLog.direction * deltaTime
+              }
+            }
+          }
+        }
+      }
+    }
   }
   
   getPlayerPosition(): { x: number; y: number; z: number } | null {
@@ -149,6 +199,14 @@ export class GameManager {
   
   getEventBus() {
     return this.eventBus
+  }
+  
+  getObstacleSystem(): ObstacleSystem | null {
+    return this.systems.get('obstacle') as ObstacleSystem || null
+  }
+  
+  getMapSystem(): MapSystem | null {
+    return this.systems.get('map') as MapSystem || null
   }
   
   reset(): void {

@@ -3,11 +3,17 @@ import { useFrame } from '@react-three/fiber'
 import { Vector3 } from 'three'
 import Player from './Player'
 import { GameManager } from '../../game/GameManager'
+import { MapRenderer } from './MapRenderer'
+import { ObstacleRenderer } from './ObstacleRenderer'
+import { Obstacle } from '../../game/systems/ObstacleSystem'
+import { Lane } from '../../game/systems/MapSystem'
 
 export default function Game() {
   const gameManagerRef = useRef<GameManager | null>(null)
   const [playerPosition, setPlayerPosition] = useState<[number, number, number]>([0, 0, 0])
   const [isPlaying, setIsPlaying] = useState(false)
+  const [obstacles, setObstacles] = useState<Obstacle[]>([])
+  const [lanes, setLanes] = useState<Lane[]>([])
   
   useEffect(() => {
     // Initialize game manager
@@ -25,11 +31,35 @@ export default function Game() {
       setPlayerPosition([to.x, 0, -to.y]) // Convert Y to Z for 3D view
     })
     
+    // Subscribe to obstacle events
+    const obstacleSystem = gameManager.getObstacleSystem()
+    const mapSystem = gameManager.getMapSystem()
+    
+    let unsubscribeObstacles: (() => void) | null = null
+    let unsubscribeMap: (() => void) | null = null
+    
+    if (obstacleSystem) {
+      unsubscribeObstacles = obstacleSystem.on('obstaclesUpdated', (updatedObstacles: Obstacle[]) => {
+        setObstacles(updatedObstacles)
+      })
+    }
+    
+    if (mapSystem) {
+      unsubscribeMap = mapSystem.on('mapUpdated', (updatedLanes: Lane[]) => {
+        setLanes(updatedLanes)
+      })
+      
+      // Get initial lanes
+      setLanes(mapSystem.getLanes())
+    }
+    
     // Log initial state
     console.log('Game initialized')
     
     return () => {
       unsubscribe()
+      unsubscribeObstacles?.()
+      unsubscribeMap?.()
       gameManager.reset()
     }
   }, [])
@@ -48,10 +78,14 @@ export default function Game() {
   return (
     <>
       {isPlaying && (
-        <Player 
-          position={playerPosition} 
-          onPositionChange={handlePlayerPositionChange}
-        />
+        <>
+          <MapRenderer lanes={lanes} />
+          <ObstacleRenderer obstacles={obstacles} />
+          <Player 
+            position={playerPosition} 
+            onPositionChange={handlePlayerPositionChange}
+          />
+        </>
       )}
     </>
   )
